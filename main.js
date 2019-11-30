@@ -1,13 +1,15 @@
 const {app, BrowserWindow, Tray, Menu, nativeImage, dialog, session, protocol, ipcMain} = require('electron');
-const electron = require('electron')
+const {setup: setupPushReceiver} = require('electron-push-receiver');
 const path = require('path');
-const Constants = require('./main/Constants');
+const Badge = require('electron-windows-badge');
 
+const Constants = require('./main/Constants')
 
+const {IS_DEV , PROTOCOL} = require("./main/Constants");
 
-app.setAppUserModelId(process.env.NODE_ENV === 'development' ? process.execPath : 'vn.base.checkin');
+app.setAppUserModelId(process.env.NODE_ENV === 'development' ? process.execPath : PROTOCOL);
 
-app.commandLine.appendSwitch('auth-server-whitelist', '*.base.vn, *.basecdn.net');
+// app.commandLine.appendSwitch('auth-server-whitelist', '*.base.vn, *.basecdn.net');
 
 app.setLoginItemSettings({
     openAtLogin: true,
@@ -18,9 +20,10 @@ app.setLoginItemSettings({
 let tray = null;
 let win = null;
 
+
+
 const createWindow = () => {
-
-
+    
 
     // Fix file:// absolute path created by React
     session.fromPartition(Constants.partition, {cache: true}).protocol.interceptFileProtocol('file', (request, callback) => {
@@ -30,7 +33,7 @@ const createWindow = () => {
         if (err) {dialog.showErrorBox('Failed to register protocol', err.toString())}
     });
 
-    protocol.registerHttpProtocol('vn.base.checkin', (request, callback) => {
+    protocol.registerHttpProtocol(PROTOCOL, (request, callback) => {
         console.log('request', request);
 
         return callback({uploadData: request.uploadData, url: request.url, method: request.method})
@@ -41,22 +44,25 @@ const createWindow = () => {
     });
 
     win = new BrowserWindow({
-        minHeight: 820,
+        minHeight: 600,
         minWidth: 1080,
         width: 1200,
-        height: 820,
+        height: 800,
         useContentSize: true,
-        icon: path.join(__dirname, 'build/icon.ico'),
+        icon: path.join(__dirname, 'assets/icon.ico'),
         webPreferences: {
             nodeIntegration: true,
             enableRemoteModule: true,
             partition: Constants.partition
         }
     });
+    new Badge(win, {});
 
-    const image = nativeImage.createFromPath(path.join(__dirname, 'build/icon.ico'));
+    const image = nativeImage.createFromPath(path.join(__dirname, 'assets/icon.ico'));
     tray = new Tray(image);
-    tray.setToolTip('Base.vn' + process.env.NODE_ENV === 'development' ? ' dev mode' : '');
+
+
+    tray.setToolTip('SELF Taught' + process.env.NODE_ENV === 'development' ? ' dev mode' : '');
     const contextMenu = Menu.buildFromTemplate([
         {label: 'Exit', click: () => {win.destroy();app.quit();}},
         {label: 'Show',click: () => win.show()}
@@ -70,14 +76,18 @@ const createWindow = () => {
 
     win.on('close', e => {
         e.preventDefault();
-        
         win.hide();
         return false;
     });
 
+    setupPushReceiver(win.webContents);
+
     require('./main/hotkey');
 };
 
+
+
+// Accept only one window open !
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     app.quit();
@@ -88,16 +98,14 @@ if (!gotTheLock) {
         win.show();
         win.focus();
 
-        if (argv[1] && argv[1].startsWith('vn.base.checkin://')) {
+        if (argv[1] && argv[1].startsWith(`${PROTOCOL}://`)) {
             ipcMain.emit('url.received', event, argv[1]);
         }
     });
 
-    app.on('ready',createWindow);
+    app.on('ready', createWindow);
 
-    
-
-    app.on('window-all-closed',app.quit);
+    app.on('window-all-closed', app.quit);
 
     require('./main/autoUpdater');
 }

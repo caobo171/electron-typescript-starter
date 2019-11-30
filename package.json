@@ -10,7 +10,7 @@
       "appId": "vn.base.checkin",
       "productName": "Self taught",
       "files": [
-        "build/**/*",
+        "client/build/**/*",
         "node_modules/**/*",
         "main/**/*",
         "basevision/**/*",
